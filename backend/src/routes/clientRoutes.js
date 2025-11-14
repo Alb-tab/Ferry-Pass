@@ -1,5 +1,5 @@
 import express from 'express';
-import { getAsync, allAsync, runAsync } from '../models/database.js';
+import { getAsync, allAsync, runAsync } from '../models/database-pg.js';
 import { verifyToken } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -10,7 +10,7 @@ router.get('/', async (req, res) => {
     const { cpf } = req.query;
 
     if (cpf) {
-      const client = await getAsync('SELECT * FROM clients WHERE cpf = ?', [cpf]);
+      const client = await getAsync('SELECT * FROM clients WHERE cpf = $1', [cpf]);
       return res.json(client || {});
     }
 
@@ -32,11 +32,11 @@ router.post('/', async (req, res) => {
     }
 
     const result = await runAsync(
-      'INSERT INTO clients (cpf, name, email, phone) VALUES (?, ?, ?, ?)',
+      'INSERT INTO clients (cpf, name, email, phone) VALUES ($1, $2, $3, $4) RETURNING id',
       [cpf, name, email || null, phone || null]
     );
 
-    res.status(201).json({ id: result.id, cpf, name, email, phone });
+    res.status(201).json({ id: result.rows[0].id, cpf, name, email, phone });
   } catch (error) {
     if (error.message.includes('UNIQUE')) {
       return res.status(400).json({ error: 'CPF já cadastrado' });
@@ -53,7 +53,7 @@ router.put('/:id', async (req, res) => {
     const { name, email, phone } = req.body;
 
     await runAsync(
-      'UPDATE clients SET name = ?, email = ?, phone = ? WHERE id = ?',
+      'UPDATE clients SET name = $1, email = $2, phone = $3 WHERE id = $4',
       [name, email, phone, id]
     );
 

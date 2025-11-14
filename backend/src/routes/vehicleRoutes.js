@@ -1,5 +1,5 @@
 import express from 'express';
-import { getAsync, allAsync, runAsync } from '../models/database.js';
+import { getAsync, allAsync, runAsync } from '../models/database-pg.js';
 
 const router = express.Router();
 
@@ -9,7 +9,7 @@ router.get('/', async (req, res) => {
     const { plate } = req.query;
 
     if (plate) {
-      const vehicle = await getAsync('SELECT * FROM vehicles WHERE plate = ?', [plate]);
+      const vehicle = await getAsync('SELECT * FROM vehicles WHERE plate = $1', [plate]);
       return res.json(vehicle || {});
     }
 
@@ -31,11 +31,11 @@ router.post('/', async (req, res) => {
     }
 
     const result = await runAsync(
-      'INSERT INTO vehicles (plate, model, vehicle_type, owner_client_id) VALUES (?, ?, ?, ?)',
+      'INSERT INTO vehicles (plate, model, vehicle_type, owner_client_id) VALUES ($1, $2, $3, $4) RETURNING id',
       [plate, model, vehicle_type, owner_client_id || null]
     );
 
-    res.status(201).json({ id: result.id, plate, model, vehicle_type, owner_client_id });
+    res.status(201).json({ id: result.rows[0].id, plate, model, vehicle_type, owner_client_id });
   } catch (error) {
     if (error.message.includes('UNIQUE')) {
       return res.status(400).json({ error: 'Placa já cadastrada' });
@@ -55,7 +55,7 @@ router.get('/fares', async (req, res) => {
     }
 
     const fare = await getAsync(
-      'SELECT * FROM fares WHERE route_id = ? AND vehicle_type = ?',
+      'SELECT * FROM fares WHERE route_id = $1 AND vehicle_type = $2',
       [route_id, vehicle_type]
     );
 

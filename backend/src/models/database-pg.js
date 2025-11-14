@@ -240,15 +240,27 @@ export async function initializeDatabase() {
           code VARCHAR(50) UNIQUE NOT NULL,
           sailing_id INT NOT NULL REFERENCES sailings(id),
           client_id INT NOT NULL REFERENCES clients(id),
+          vehicle_id INT REFERENCES vehicles(id),
           ticket_type VARCHAR(20) NOT NULL,
+          seat_or_slot VARCHAR(50),
           price DECIMAL(10, 2),
           pdf_path VARCHAR(255),
           qr_code VARCHAR(255),
           email_sent BOOLEAN DEFAULT FALSE,
+          status VARCHAR(20) DEFAULT 'active',
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
       `);
       console.log('✅ Tabela tickets criada');
+
+      // Garantir colunas para tickets (migrations safe)
+      try {
+        await client.query(`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS vehicle_id INT REFERENCES vehicles(id);`);
+        await client.query(`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS seat_or_slot VARCHAR(50);`);
+        await client.query(`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active';`);
+      } catch (err) {
+        // ignore
+      }
 
       console.log('\n✅ ✅ ✅ BANCO DE DADOS INICIALIZADO COM SUCESSO! ✅ ✅ ✅\n');
     } finally {

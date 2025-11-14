@@ -55,16 +55,16 @@ router.post('/', verifyToken, async (req, res) => {
     // Gerar código único
     const code = `TICKET-${sailing_id}-${Date.now()}-${uuidv4().slice(0, 8)}`;
 
-    // Inserir ticket
+    // Inserir ticket (inclui vehicle_id se informado)
     const insertRes = await runAsync(
-      `INSERT INTO tickets (code, sailing_id, client_id, ticket_type, price, pdf_path, qr_code, email_sent) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
-      [code, sailing_id, client_id, ticket_type, amount, null, null, false]
+      `INSERT INTO tickets (code, sailing_id, client_id, vehicle_id, ticket_type, price, pdf_path, qr_code, email_sent) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+      [code, sailing_id, client_id, vehicle_id, ticket_type, amount, null, null, false]
     );
     const ticketId = insertRes.rows[0].id;
 
-    // Buscar dados completos para gerar PDF
+    // Buscar dados completos para gerar PDF (usar departure_time)
     const ticket = await getAsync(
-      `SELECT t.id, t.code, t.price as fare_paid, c.id as client_id, c.name, c.email, c.phone, v.plate, v.model, s.departure, r.name as route_name, r.origin, r.destination
+      `SELECT t.id, t.code, t.price as fare_paid, c.id as client_id, c.name, c.email, c.phone, v.plate, v.model, s.departure_time AS departure, r.name as route_name, r.origin, r.destination
        FROM tickets t
        JOIN clients c ON t.client_id = c.id
        LEFT JOIN vehicles v ON t.vehicle_id = v.id
@@ -99,13 +99,13 @@ router.get('/:code/pdf', async (req, res) => {
     const { code } = req.params;
 
     const ticket = await getAsync(
-      `SELECT t.*, c.name, c.email, c.phone, v.plate, v.model, s.departure, r.name as route_name, r.origin, r.destination
+      `SELECT t.*, c.name, c.email, c.phone, v.plate, v.model, s.departure_time AS departure, r.name as route_name, r.origin, r.destination
        FROM tickets t
        JOIN clients c ON t.client_id = c.id
        LEFT JOIN vehicles v ON t.vehicle_id = v.id
        JOIN sailings s ON t.sailing_id = s.id
        JOIN routes r ON s.route_id = r.id
-       WHERE t.code = ?`,
+       WHERE t.code = $1`,
       [code]
     );
 
@@ -138,10 +138,10 @@ router.get('/', async (req, res) => {
     let params = [];
 
     if (code) {
-      sql += ' WHERE t.code = ?';
+      sql += ' WHERE t.code = $1';
       params = [code];
     } else if (client_id) {
-      sql += ' WHERE t.client_id = ?';
+      sql += ' WHERE t.client_id = $1';
       params = [client_id];
     }
 
